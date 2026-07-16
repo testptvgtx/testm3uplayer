@@ -1,6 +1,7 @@
 {
-  "name": "my-m3u-app",
+  "name": "m3u-player-server",
   "version": "1.0.0",
+  "description": "M3U8 Web Player and Uploader",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
