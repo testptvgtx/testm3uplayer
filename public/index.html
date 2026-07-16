@@ -27,7 +27,6 @@
 
     <h2>ระบบเล่นและอัปโหลดไฟล์ M3U (IPTV Player)</h2>
 
-    <!-- ส่วนที่ 1: ฟอร์มนำเข้าไฟล์ -->
     <div class="box">
         <h3>1. นำเข้าไฟล์ Playlist (.m3u)</h3>
         <form id="uploadForm" enctype="multipart/form-data">
@@ -37,17 +36,14 @@
         <p id="uploadStatus"></p>
     </div>
 
-    <!-- ส่วนที่ 2: เครื่องเล่นวิดีโอและรายการช่อง -->
     <div class="box">
         <h3 id="playingTitle">2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: สตรีมทดสอบระบบ HLS)</h3>
         <div class="player-container">
             
-            <!-- ฝั่งซ้าย: เครื่องเล่น -->
             <div class="video-area">
                 <video id="video" controls></video>
             </div>
             
-            <!-- ฝั่งขวา: รายชื่อช่องทีวีที่ดึงมาจากไฟล์ M3U -->
             <div class="playlist-area">
                 <div class="playlist-header">รายการช่องสตรีมมิ่ง (<span id="channelCount">0</span> ช่อง)</div>
                 <ul class="channel-list" id="channelList">
@@ -79,10 +75,8 @@
             }
         }
 
-        // ตั้งค่าช่องสตรีมมิ่งเริ่มต้นทดสอบระบบ
         playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
 
-        // ฟังก์ชันถอดรหัสข้อความไฟล์ M3U
         function parseM3U(textContent) {
             const lines = textContent.split('\n');
             const channels = [];
@@ -101,20 +95,19 @@
             return channels;
         }
 
-        // จัดการเมื่อผู้ใช้กดอัปโหลดไฟล์
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
             const statusText = document.getElementById('uploadStatus');
             
-            // ดึงอ็อบเจกต์ไฟล์ตัวแรกออกมาอย่างถูกต้อง
+            // ดึงไฟล์ที่เลือกออกมาอย่างถูกต้อง
             const targetFile = fileInput.files[0]; 
             if (!targetFile) return;
 
             statusText.style.color = '#333';
             statusText.innerText = "⏳ กำลังอ่านข้อมูลไฟล์และบันทึกข้อมูล...";
 
-            // อ่านไฟล์แสดงผลขึ้นหน้าจอทันทีเพื่อลดการดีเลย์
+            // แตกช่องขึ้นจอพรีวิวก่อนทันทีเพื่อความเร็ว
             const reader = new FileReader();
             reader.onload = function(event) {
                 const text = event.target.result;
@@ -148,7 +141,7 @@
             };
             reader.readAsText(targetFile);
 
-            // พยายามส่งไฟล์เข้าโฟลเดอร์หลังบ้านของเซิร์ฟเวอร์
+            // ส่งข้อมูลไฟล์จริงเข้าสู่เซิร์ฟเวอร์
             const formData = new FormData();
             formData.append('playlist', targetFile); 
 
@@ -168,7 +161,7 @@
                 }
             } catch (error) {
                 statusText.style.color = 'orange';
-                statusText.innerText = `⚠️ อ่านสตรีมสำเร็จแล้ว แต่ระบบ Free ไม่มีสิทธิ์เขียนไฟล์ถาวร (ไม่มี Add Disk)`;
+                statusText.innerText = `⚠️ พรีวิวรายการสำเร็จแล้ว! แต่บันทึกเซิร์ฟเวอร์หลังบ้านแบบถาวรไม่ได้เนื่องจากระบบ Free ไม่มี Add Disk`;
             }
         });
     </script>
