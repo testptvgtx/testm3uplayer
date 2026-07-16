@@ -19,7 +19,7 @@
         .channel-item.active { background: #007bff; color: #fff; font-weight: bold; }
         button { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
-        #uploadStatus { margin-top: 10px; font-size: 14px; }
+        #uploadStatus { margin-top: 10px; font-size: 14px; font-weight: bold; }
         @media (max-width: 768px) { .player-container { flex-direction: column; } .playlist-area { height: 300px; } }
     </style>
 </head>
@@ -32,14 +32,14 @@
         <h3>1. นำเข้าไฟล์ Playlist (.m3u)</h3>
         <form id="uploadForm" enctype="multipart/form-data">
             <input type="file" id="fileInput" name="playlist" accept=".m3u" required>
-            <button type="submit">บันทึกไฟล์เพย์ลิส</button>
+            <button type="submit">บันทึกไฟล์เพลย์ลิสต์</button>
         </form>
         <p id="uploadStatus"></p>
     </div>
 
     <!-- ส่วนที่ 2: เครื่องเล่นวิดีโอและรายการช่อง -->
     <div class="box">
-        <h3 id="playingTitle">2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: ลิงก์ทดสอบระบบ)</h3>
+        <h3 id="playingTitle">2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: สตรีมทดสอบระบบ HLS)</h3>
         <div class="player-container">
             
             <!-- ฝั่งซ้าย: เครื่องเล่น -->
@@ -62,36 +62,27 @@
         const video = document.getElementById('video');
         let hls = null;
 
-        // ฟังก์ชันสำหรับสั่งเล่นลิงก์วิดีโอ M3U8
         function playStream(url, channelName) {
             document.getElementById('playingTitle').innerText = `2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: ${channelName})`;
             
-            // ไฮไลต์ช่องที่กำลังเลือกอยู่
-            const items = document.querySelectorAll('.channel-item');
-            items.forEach(item => item.classList.remove('active'));
-            event?.target?.classList.add('active');
-
             if (Hls.isSupported()) {
-                if (hls) hls.destroy(); // ล้างหน่วยความจำช่องเก่าออกก่อน
+                if (hls) hls.destroy(); 
                 hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    video.play().catch(() => console.log("รอผู้ใช้กด Play"));
-                });
-                hls.on(Hls.Events.ERROR, function (event, data) {
-                    if (data.fatal) console.error("สตรีมนี้มีปัญหาเรื่องโหลดข้อมูลหรือระบบความปลอดภัย CORS");
+                    video.play().catch(() => console.log("รอผู้ใช้กดเริ่มเล่น"));
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
-                video.play().catch(() => console.log("รอผู้ใช้กด Play"));
+                video.play().catch(() => console.log("รอผู้ใช้กดเริ่มเล่น"));
             }
         }
 
-        // เริ่มต้นรันช่องทดสอบระบบตัวแรก
+        // ตัวเริ่มต้นระบบ
         playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
 
-        // ฟังก์ชันแกะรหัสอ่านเนื้อหาในไฟล์ M3U (M3U Parser)
+        // ฟังก์ชันถอดรหัสข้อความใน M3U
         function parseM3U(textContent) {
             const lines = textContent.split('\n');
             const channels = [];
@@ -100,60 +91,67 @@
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (line.startsWith('#EXTINF:')) {
-                    // แยกรหัสเอาชื่อช่องออกมาหลังจากเครื่องหมายจุลภาค (,)
                     const commaIndex = line.lastIndexOf(',');
                     currentName = commaIndex !== -1 ? line.substring(commaIndex + 1).trim() : 'ช่องไม่มีชื่อ';
                 } else if (line.startsWith('http')) {
-                    // เจอบรรทัดลิงก์สตรีม จับคู่กับชื่อช่องแล้วเก็บลงอาร์เรย์
                     channels.push({ name: currentName || 'ช่องนิรนาม', url: line });
-                    currentName = ''; // ล้างค่าเพื่อรอรอบใหม่
+                    currentName = '';
                 }
             }
             return channels;
         }
 
-        // ระบบฟอร์มจัดการส่งไฟล์ไปหลังบ้าน และทำการดึงช่องมาเล่นสดทันที
+        // เมื่อกด Submit ฟอร์ม
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
             const statusText = document.getElementById('uploadStatus');
-            const file = fileInput.files[0];
             
-            if(!file) return;
+            // ดึงไฟล์ลำดับแรกสุด [0] ออกมาแก้อย่างถูกต้อง
+            const file = fileInput.files[0]; 
+            if (!file) return;
 
-            // ขั้นตอนเสริมพิเศษหน้าบ้าน: อ่านและพรีวิวช่องให้เล่นบนหน้าจอก่อนทันที
+            // สั่งอ่านไฟล์พรีวิวรายการช่องขึ้นหน้าจอทันที
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
+            reader.onload = function(event) {
+                const text = event.target.result;
                 const channels = parseM3U(text);
                 
                 const listContainer = document.getElementById('channelList');
                 document.getElementById('channelCount').innerText = channels.length;
                 
-                if(channels.length === 0) {
-                    listContainer.innerHTML = '<li class="channel-item">❌ ไม่พบข้อความลิงก์สตรีมในไฟล์นี้</li>';
+                if (channels.length === 0) {
+                    listContainer.innerHTML = '<li class="channel-item">❌ ไม่พบลิงก์สตรีมในไฟล์ที่นำเข้า</li>';
                     return;
                 }
 
-                listContainer.innerHTML = ''; // ล้างรายการเก่าออก
+                listContainer.innerHTML = ''; 
                 channels.forEach((ch, index) => {
                     const li = document.createElement('li');
                     li.className = 'channel-item';
                     li.innerText = `📺 ${ch.name}`;
-                    li.onclick = (event) => playStream(ch.url, ch.name);
+                    li.onclick = (e) => {
+                        // เปลี่ยนคลาส active ไฮไลต์ปุ่มช่องที่เลือก
+                        document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
+                        li.classList.add('active');
+                        playStream(ch.url, ch.name);
+                    };
                     listContainer.appendChild(li);
                     
-                    // สั่งให้ลองเล่นช่องแรกสุดของไฟล์ที่นำเข้ามาทันที
-                    if(index === 0) playStream(ch.url, ch.name);
+                    if (index === 0) {
+                        li.classList.add('active');
+                        playStream(ch.url, ch.name);
+                    }
                 });
             };
-            reader.readAsText(file);
+            reader.readAsText(file); // ส่งตัวแปรไฟล์เดี่ยวเข้าใช้งานเพื่อแก้ไขอาการค้าง
 
-            // ขั้นตอนหลัก: ส่งไฟล์ไปเก็บบันทึกบนฐานข้อมูลโฟลเดอร์หลังบ้าน (Render Server)
+            // ส่งข้อมูลไปเซฟที่ Backend Server
             const formData = new FormData();
-            formData.append('playlist', file);
+            formData.append('playlist', file); // แก้ไขส่งไฟล์ตรงๆ ไปหลังบ้าน
+            
             statusText.style.color = '#333';
-            statusText.innerText = "กำลังส่งไฟล์บันทึกลงฐานข้อมูลหลังบ้าน...";
+            statusText.innerText = "⏳ กำลังอัปโหลดและประมวลผลข้อมูลเพลย์ลิสต์...";
 
             try {
                 const response = await fetch('/api/upload-playlist', {
@@ -162,16 +160,17 @@
                 });
                 const result = await response.json();
                 
-                if(response.ok) {
+                if (response.ok) {
                     statusText.style.color = 'green';
-                    statusText.innerHTML = `✅ บันทึกเข้าคลังหลังบ้านสำเร็จ! ชื่อไฟล์รหัส: <b>${result.fileId}</b>`;
+                    statusText.innerHTML = `✅ บันทึกเข้าคลังหลังบ้านสำเร็จ! รหัสอ้างอิงไฟล์: <b>${result.fileId}</b>`;
                 } else {
                     statusText.style.color = 'red';
-                    statusText.innerText = `❌ เซิร์ฟเวอร์ปฏิเสธ: ${result.error}`;
+                    statusText.innerText = `❌ ข้อผิดพลาดจากเซิร์ฟเวอร์: ${result.error}`;
                 }
             } catch (error) {
+                // แจ้งเตือนข้อจำกัด Instance Free ของ Render
                 statusText.style.color = 'orange';
-                statusText.innerText = `⚠️ ประมวลผลสำเร็จหน้าบ้าน แต่เชื่อมเซิร์ฟเวอร์หลังบ้านเพื่อเซฟไฟล์ลงไดเรกทอรีไม่ได้`;
+                statusText.innerText = `⚠️ แสดงช่องสำเร็จแล้ว! แต่บันทึกไฟล์ถาวรไม่สำเร็จเนื่องจากเซิร์ฟเวอร์ระบบ Free ไม่มีพื้นที่ดิสก์รองรับ`;
             }
         });
     </script>
