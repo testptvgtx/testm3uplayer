@@ -79,10 +79,10 @@
             }
         }
 
-        // ตัวเริ่มต้นระบบ
+        // ตั้งค่าช่องสตรีมมิ่งเริ่มต้นทดสอบระบบ
         playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
 
-        // ฟังก์ชันถอดรหัสข้อความใน M3U
+        // ฟังก์ชันถอดรหัสข้อความไฟล์ M3U
         function parseM3U(textContent) {
             const lines = textContent.split('\n');
             const channels = [];
@@ -101,17 +101,20 @@
             return channels;
         }
 
-        // เมื่อกด Submit ฟอร์ม
+        // จัดการเมื่อผู้ใช้กดอัปโหลดไฟล์
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
             const statusText = document.getElementById('uploadStatus');
             
-            // ดึงไฟล์ลำดับแรกสุด [0] ออกมาแก้อย่างถูกต้อง
-            const file = fileInput.files[0]; 
-            if (!file) return;
+            // ดึงอ็อบเจกต์ไฟล์ตัวแรกออกมาอย่างถูกต้อง
+            const targetFile = fileInput.files[0]; 
+            if (!targetFile) return;
 
-            // สั่งอ่านไฟล์พรีวิวรายการช่องขึ้นหน้าจอทันที
+            statusText.style.color = '#333';
+            statusText.innerText = "⏳ กำลังอ่านข้อมูลไฟล์และบันทึกข้อมูล...";
+
+            // อ่านไฟล์แสดงผลขึ้นหน้าจอทันทีเพื่อลดการดีเลย์
             const reader = new FileReader();
             reader.onload = function(event) {
                 const text = event.target.result;
@@ -130,8 +133,7 @@
                     const li = document.createElement('li');
                     li.className = 'channel-item';
                     li.innerText = `📺 ${ch.name}`;
-                    li.onclick = (e) => {
-                        // เปลี่ยนคลาส active ไฮไลต์ปุ่มช่องที่เลือก
+                    li.onclick = () => {
                         document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
                         li.classList.add('active');
                         playStream(ch.url, ch.name);
@@ -144,14 +146,11 @@
                     }
                 });
             };
-            reader.readAsText(file); // ส่งตัวแปรไฟล์เดี่ยวเข้าใช้งานเพื่อแก้ไขอาการค้าง
+            reader.readAsText(targetFile);
 
-            // ส่งข้อมูลไปเซฟที่ Backend Server
+            // พยายามส่งไฟล์เข้าโฟลเดอร์หลังบ้านของเซิร์ฟเวอร์
             const formData = new FormData();
-            formData.append('playlist', file); // แก้ไขส่งไฟล์ตรงๆ ไปหลังบ้าน
-            
-            statusText.style.color = '#333';
-            statusText.innerText = "⏳ กำลังอัปโหลดและประมวลผลข้อมูลเพลย์ลิสต์...";
+            formData.append('playlist', targetFile); 
 
             try {
                 const response = await fetch('/api/upload-playlist', {
@@ -162,15 +161,14 @@
                 
                 if (response.ok) {
                     statusText.style.color = 'green';
-                    statusText.innerHTML = `✅ บันทึกเข้าคลังหลังบ้านสำเร็จ! รหัสอ้างอิงไฟล์: <b>${result.fileId}</b>`;
+                    statusText.innerHTML = `✅ บันทึกเข้าเซิร์ฟเวอร์สำเร็จ! รหัสไฟล์: <b>${result.fileId}</b>`;
                 } else {
                     statusText.style.color = 'red';
-                    statusText.innerText = `❌ ข้อผิดพลาดจากเซิร์ฟเวอร์: ${result.error}`;
+                    statusText.innerText = `❌ ข้อผิดพลาดจากระบบ: ${result.error}`;
                 }
             } catch (error) {
-                // แจ้งเตือนข้อจำกัด Instance Free ของ Render
                 statusText.style.color = 'orange';
-                statusText.innerText = `⚠️ แสดงช่องสำเร็จแล้ว! แต่บันทึกไฟล์ถาวรไม่สำเร็จเนื่องจากเซิร์ฟเวอร์ระบบ Free ไม่มีพื้นที่ดิสก์รองรับ`;
+                statusText.innerText = `⚠️ อ่านสตรีมสำเร็จแล้ว แต่ระบบ Free ไม่มีสิทธิ์เขียนไฟล์ถาวร (ไม่มี Add Disk)`;
             }
         });
     </script>
