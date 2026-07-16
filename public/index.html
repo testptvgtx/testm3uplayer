@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>M3U8 Web Player & IPTV Streamer</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+  :root{
+    --bg: #080D1A;
+    --bg-elevated: #121A30;
+    --bg-row: #1A2440;
+    --bg-row-hover: #212C4E;
+    --border: rgba(255,255,255,0.07);
+    --text-primary: #F3F6FB;
+    --text-secondary: #8A93AC;
+    --accent-a: #22D3EE;
+    --accent-b: #2F80FF;
+    --live-red: #FF3B4E;
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-pill: 999px;
+    font-size: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Sarabun', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    position: relative;
+  }
+
+  /* ---------- VIDEO PLAYER ---------- */
+  .player-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    overflow: hidden;
+  }
+  .player-wrap video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .player-status {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(8,13,26,0.55);
+    backdrop-filter: blur(6px);
+    padding: 5px 10px 5px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .3px;
+  }
+  .player-status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--live-red);
+    box-shadow: 0 0 0 0 rgba(255,59,78,.6);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,59,78,.55); }
+    70% { box-shadow: 0 0 0 7px rgba(255,59,78,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,59,78,0); }
+  }
+
+  .now-playing {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .now-playing .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin: 0 0 4px;
+  }
+  .now-playing h1 {
+    font-size: 17px;
+    margin: 0;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- SECTION HEADER (logo style) ---------- */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-weight: 800;
+    font-size: 21px;
+    letter-spacing: -0.5px;
+  }
+  .brand .m3 {
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .brand .u {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    margin-left: 2px;
+    align-self: center;
+    opacity: .8;
+  }
+  .channel-count-pill {
+    background: var(--bg-row);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+  }
+  .channel-count-pill b { color: var(--text-primary); }
+
+  .saved-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #35D68C;
+    background: rgba(53,214,140,0.12);
+    border: 1px solid rgba(53,214,140,0.3);
+    padding: 5px 9px;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+  }
+
+  .clear-data-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .clear-data-link:hover { color: #FF6B6B; }
+
+  /* ---------- CHANNEL LIST ---------- */
+  .channel-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 10px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .channel-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-row);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .channel-item:active { transform: scale(0.985); }
+  .channel-item:hover { background: var(--bg-row-hover); }
+  .channel-item.active {
+    border-color: rgba(47,128,255,0.55);
+    background: linear-gradient(90deg, rgba(34,211,238,0.12), rgba(47,128,255,0.12));
+  }
+
+  .channel-thumb {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #061021;
+    font-weight: 800;
+  }
+  .channel-item.active .channel-thumb {
+    box-shadow: 0 0 0 2px var(--bg-row), 0 0 0 3.5px var(--accent-b);
+  }
+
+  .channel-meta {
+    flex: 1;
+    min-width: 0;
+  }
+  .channel-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .channel-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .live-badge {
+    flex: 0 0 auto;
+    background: var(--live-red);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    padding: 5px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .play-badge {
+    flex: 0 0 auto;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+  .channel-item.active .play-badge {
+    background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color: #061021;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 26px 16px;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+  }
+
+  /* ---------- BOTTOM IMPORT CARD ---------- */
+  .import-card {
+    margin: 18px 12px calc(20px + env(safe-area-inset-bottom));
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+  }
+  .import-card h2 {
+    font-size: 14px;
+    margin: 0 0 3px;
+    font-weight: 700;
+  }
+  .import-card .hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 14px;
+  }
+
+  .field-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+
+  .url-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .url-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-row);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 13.5px;
+    padding: 11px 12px;
+    border-radius: var(--radius-md);
+    outline: none;
+  }
+  .url-row input[type="text"]::placeholder { color: #626C85; }
+  .url-row input[type="text"]:focus { border-color: var(--accent-b); }
+
+  .divider-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    margin: 4px 0 14px;
+  }
+  .divider-or::before, .divider-or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-row);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 16px;
+  }
+  .file-row label.file-btn {
+    flex: 0 0 auto;
+    background: rgba(255,255,255,0.07);
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 8px 13px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .file-row label.file-btn:hover { background: rgba(255,255,255,0.12); }
+  .file-row input[type="file"] { display: none; }
+  .file-name {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .save-btn {
+    width: 100%;
+    border: none;
+    padding: 13px 16px;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    color: #06132A;
+    font-size: 14.5px;
+    font-weight: 800;
+    letter-spacing: .2px;
+    cursor: pointer;
+    transition: transform .1s ease, filter .15s ease;
+  }
+  .save-btn:hover { filter: brightness(1.06); }
+  .save-btn:active { transform: scale(0.98); }
+  .save-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+  #uploadStatus {
+    margin: 12px 2px 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    min-height: 16px;
+  }
+  .status-idle { color: var(--text-secondary); }
+  .status-loading { color: #FFC94D; }
+  .status-success { color: #35D68C; }
+  .status-error { color: #FF6B6B; }
+  .status-warning { color: #FFA24D; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--bg-row-hover); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 1. VIDEO PLAYER -->
+  <div class="player-wrap">
+    <video id="video" controls playsinline></video>
+    <div class="player-status"><span class="dot"></span> กำลังเล่น</div>
+  </div>
+  <div class="now-playing">
+    <p class="eyebrow">กำลังสตรีม</p>
+    <h1 id="playingTitle">สตรีมทดสอบระบบ HLS</h1>
+  </div>
+
+  <!-- 2. PLAYLIST -->
+  <div class="section-header">
+    <div class="brand"><span class="m3">M3U</span><span class="u">PLAYER</span></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span id="savedBadge" class="saved-badge" style="display:none;">บันทึกไว้ในเครื่อง</span>
+      <div class="channel-count-pill"><b id="channelCount">0</b> ช่อง</div>
+    </div>
+  </div>
+
+  <ul class="channel-list" id="channelList">
+    <li class="channel-item active" data-url="https://mux.dev" data-name="สตรีมทดสอบระบบ HLS">
+      <div class="channel-thumb">📺</div>
+      <div class="channel-meta">
+        <div class="channel-name">สตรีมทดสอบระบบ</div>
+        <div class="channel-sub">คลิกเพื่อทดสอบเล่น ©Copyright By_NETI</div>
+      </div>
+      <span class="live-badge">LIVE NOW</span>
+    </li>
+  </ul>
+
+  <!-- 3. IMPORT / SAVE (BOTTOM) -->
+  <div class="import-card">
+    <h2>นำเข้าเพลย์ลิสต์</h2>
+    <p class="hint">วางลิงก์ไฟล์ .m3u หรือเลือกไฟล์จากเครื่อง แล้วกดบันทึก</p>
+
+    <p class="field-label">วางลิงก์ M3U</p>
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="https://example.com/playlist.m3u">
+    </div>
+
+    <div class="divider-or">หรือ</div>
+
+    <form id="uploadForm">
+      <p class="field-label">อัปโหลดไฟล์</p>
+      <div class="file-row">
+        <label class="file-btn" for="fileInput">เลือกไฟล์</label>
+        <input type="file" id="fileInput" name="playlist" accept=".m3u">
+        <span class="file-name" id="fileName">ยังไม่ได้เลือกไฟล์</span>
+      </div>
+      <button type="submit" class="save-btn" id="saveBtn">บันทึกเพลย์ลิสต์</button>
+    </form>
+
+    <p id="uploadStatus" class="status-idle"></p>
+    <button type="button" class="clear-data-link" id="clearDataBtn">ล้างเพลย์ลิสต์ในเครื่องนี้</button>
+  </div>
+
+</div>
+
+<script>
+  const video = document.getElementById('video');
+  const channelList = document.getElementById('channelList');
+  const channelCount = document.getElementById('channelCount');
+  const playingTitle = document.getElementById('playingTitle');
+  const savedBadge = document.getElementById('savedBadge');
+  let hls = null;
+
+  const STORAGE_KEY = 'm3uplayer_channels_v1';
+
+  // ---- localStorage helpers (เก็บเพลย์ลิสต์ไว้ในเครื่อง/เบราว์เซอร์นี้) ----
+  function saveChannelsToDevice(channels) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(channels));
+      savedBadge.style.display = 'inline-block';
+    } catch (err) {
+      console.warn('บันทึกลงเครื่องไม่สำเร็จ (พื้นที่เก็บข้อมูลอาจเต็ม):', err);
+    }
+  }
+
+  function loadChannelsFromDevice() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const channels = JSON.parse(raw);
+      if (Array.isArray(channels) && channels.length > 0) return channels;
+      return null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function clearChannelsFromDevice() {
+    localStorage.removeItem(STORAGE_KEY);
+    savedBadge.style.display = 'none';
+  }
+
+  function playStream(url, channelName) {
+    playingTitle.innerText = channelName;
+
+    if (Hls.isSupported()) {
+      if (hls) hls.destroy();
+      hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        video.play().catch(() => console.log('รอผู้ใช้กดเริ่มเล่น'));
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.play().catch(() => console.log('รอผู้ใช้กดเริ่มเล่น'));
+    }
+  }
+
+  function bindChannelClick(li, url, name) {
+    li.addEventListener('click', () => {
+      document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
+      li.classList.add('active');
+      playStream(url, name);
+    });
+  }
+
+  // bind the default test item
+  document.querySelectorAll('.channel-item').forEach(li => {
+    bindChannelClick(li, li.dataset.url, li.dataset.name);
+  });
+
+  // ---- โหลดเพลย์ลิสต์ที่เคยบันทึกไว้ในเครื่องนี้ (ถ้ามี) ----
+  const savedChannels = loadChannelsFromDevice();
+  if (savedChannels) {
+    savedBadge.style.display = 'inline-block';
+    renderChannels(savedChannels, { skipSave: true });
+    setStatus('📂 โหลดเพลย์ลิสต์ที่บันทึกไว้ในเครื่องนี้แล้ว', 'status-success');
+  } else {
+    playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
+  }
+
+  document.getElementById('clearDataBtn').addEventListener('click', () => {
+    if (!confirm('ล้างเพลย์ลิสต์ที่บันทึกไว้ในเครื่องนี้หรือไม่?')) return;
+    clearChannelsFromDevice();
+    channelList.innerHTML = `
+      <li class="channel-item active" data-url="https://mux.dev" data-name="สตรีมทดสอบระบบ HLS">
+        <div class="channel-thumb">📺</div>
+        <div class="channel-meta">
+          <div class="channel-name">สตรีมทดสอบระบบ</div>
+          <div class="channel-sub">คลิกเพื่อทดสอบการเล่น</div>
+        </div>
+        <span class="live-badge">LIVE NOW</span>
+      </li>`;
+    document.querySelectorAll('.channel-item').forEach(li => bindChannelClick(li, li.dataset.url, li.dataset.name));
+    channelCount.innerText = '0';
+    playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
+    setStatus('🗑️ ล้างข้อมูลเรียบร้อยแล้ว', 'status-idle');
+  });
+
+  function parseM3U(textContent) {
+    const lines = textContent.split('\n');
+    const channels = [];
+    let currentName = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('#EXTINF:')) {
+        const commaIndex = line.lastIndexOf(',');
+        currentName = commaIndex !== -1 ? line.substring(commaIndex + 1).trim() : 'ช่องไม่มีชื่อ';
+      } else if (line.startsWith('http')) {
+        channels.push({ name: currentName || 'ช่องนิรนาม', url: line });
+        currentName = '';
+      }
+    }
+    return channels;
+  }
+
+  function renderChannels(channels, opts = {}) {
+    channelCount.innerText = channels.length;
+
+    if (channels.length === 0) {
+      channelList.innerHTML = '<li class="empty-state">❌ ไม่พบลิงก์สตรีมในไฟล์ที่นำเข้า</li>';
+      return;
+    }
+
+    // บันทึกลงเครื่องอัตโนมัติ เว้นแต่กำลังโหลดข้อมูลที่เคยบันทึกไว้อยู่แล้ว (กันเขียนซ้ำ)
+    if (!opts.skipSave) saveChannelsToDevice(channels);
+
+    channelList.innerHTML = '';
+    channels.forEach((ch, index) => {
+      const li = document.createElement('li');
+      li.className = 'channel-item' + (index === 0 ? ' active' : '');
+      li.innerHTML = `
+        <div class="channel-thumb">📺</div>
+        <div class="channel-meta">
+          <div class="channel-name">${ch.name}</div>
+          <div class="channel-sub">${ch.url}</div>
+        </div>
+        <span class="play-badge">▶</span>
+      `;
+      channelList.appendChild(li);
+      bindChannelClick(li, ch.url, ch.name);
+
+      if (index === 0) playStream(ch.url, ch.name);
+    });
+  }
+
+  function setStatus(text, cls) {
+    const statusText = document.getElementById('uploadStatus');
+    statusText.className = cls;
+    statusText.innerText = text;
+  }
+
+  // ---- file name preview ----
+  const fileInput = document.getElementById('fileInput');
+  const fileNameEl = document.getElementById('fileName');
+  fileInput.addEventListener('change', () => {
+    fileNameEl.innerText = fileInput.files[0] ? fileInput.files[0].name : 'ยังไม่ได้เลือกไฟล์';
+  });
+
+  // ---- load playlist from pasted URL ----
+  const urlInput = document.getElementById('urlInput');
+
+  async function loadFromUrl(url) {
+    setStatus('⏳ กำลังโหลดเพลย์ลิสต์จากลิงก์...', 'status-loading');
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('โหลดลิงก์ไม่สำเร็จ');
+      const text = await res.text();
+      const channels = parseM3U(text);
+      renderChannels(channels);
+      setStatus('✅ โหลดเพลย์ลิสต์จากลิงก์สำเร็จ!', 'status-success');
+    } catch (err) {
+      setStatus('❌ โหลดลิงก์ไม่สำเร็จ (อาจถูกบล็อกโดย CORS หรือ URL ไม่ถูกต้อง)', 'status-error');
+    }
+  }
+
+  // ---- file upload + parse + save to server ----
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // ถ้ามีลิงก์วางไว้และไม่มีไฟล์ ให้โหลดจากลิงก์แทน
+    if (urlInput.value.trim() && !fileInput.files.length) {
+      await loadFromUrl(urlInput.value.trim());
+      return;
+    }
+
+    const targetFile = fileInput.files[0];
+    if (!targetFile) {
+      setStatus('⚠️ กรุณาวางลิงก์หรือเลือกไฟล์ก่อนบันทึก', 'status-warning');
+      return;
+    }
+
+    setStatus('⏳ กำลังอ่านข้อมูลไฟล์และบันทึกข้อมูล...', 'status-loading');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const channels = parseM3U(event.target.result);
+      renderChannels(channels);
+    };
+    reader.readAsText(targetFile);
+
+    const formData = new FormData();
+    formData.append('playlist', targetFile);
+
+    try {
+      const response = await fetch('/api/upload-playlist', { method: 'POST', body: formData });
+      const result = await response.json();
+
+      if (response.ok) {
+        setStatus(`✅ บันทึกเข้าเซิร์ฟเวอร์สำเร็จ! รหัสไฟล์: ${result.fileId}`, 'status-success');
+      } else {
+        setStatus(`❌ ข้อผิดพลาดจากระบบ: ${result.error}`, 'status-error');
+      }
+    } catch (error) {
+      setStatus('⚠️ พรีวิวรายการสำเร็จแล้ว! แต่บันทึกเซิร์ฟเวอร์ถาวรไม่ได้ (ระบบ Free ไม่มี Disk)', 'status-warning');
+    }
+  });
+</script>
+</body>
+</html>
