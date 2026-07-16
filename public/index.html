@@ -2,45 +2,158 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>M3U8 Web Player & Uploader</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8 Web Player & IPTV Streamer</title>
     <script src="https://jsdelivr.net"></script>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-        video { width: 100%; background: #000; margin-top: 10px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 20px; background: #f5f7fb; color: #333; }
+        .box { background: #fff; border: 1px solid #e1e6eb; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .player-container { display: flex; flex-direction: row; gap: 20px; margin-top: 15px; }
+        .video-area { flex: 2; min-width: 0; }
+        video { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; }
+        .playlist-area { flex: 1; border: 1px solid #ddd; border-radius: 6px; height: 450px; display: flex; flex-direction: column; background: #fff; }
+        .playlist-header { padding: 10px; background: #f1f3f5; font-weight: bold; border-bottom: 1px solid #ddd; border-top-left-radius: 6px; border-top-right-radius: 6px; }
+        .channel-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        .channel-item { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .channel-item:hover { background: #e9ecef; color: #007bff; }
+        .channel-item.active { background: #007bff; color: #fff; font-weight: bold; }
+        button { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        #uploadStatus { margin-top: 10px; font-size: 14px; }
+        @media (max-width: 768px) { .player-container { flex-direction: column; } .playlist-area { height: 300px; } }
     </style>
 </head>
 <body>
 
-    <h2>ระบบเล่นและอัปโหลดไฟล์ M3U</h2>
+    <h2>ระบบเล่นและอัปโหลดไฟล์ M3U (IPTV Player)</h2>
 
-    <!-- ส่วนที่ 1: ฟอร์มสำหรับให้ผู้ใช้อัปโหลดไฟล์ -->
+    <!-- ส่วนที่ 1: ฟอร์มนำเข้าไฟล์ -->
     <div class="box">
         <h3>1. นำเข้าไฟล์ Playlist (.m3u)</h3>
         <form id="uploadForm" enctype="multipart/form-data">
             <input type="file" id="fileInput" name="playlist" accept=".m3u" required>
-            <button type="submit">ส่งไฟล์เข้าฐานข้อมูล</button>
+            <button type="submit">บันทึกไฟล์เพย์ลิส</button>
         </form>
         <p id="uploadStatus"></p>
     </div>
 
-    <!-- ส่วนที่ 2: เครื่องเล่นวิดีโอ -->
+    <!-- ส่วนที่ 2: เครื่องเล่นวิดีโอและรายการช่อง -->
     <div class="box">
-        <h3>2. เครื่องเล่นวิดีโอ M3U8</h3>
-        <video id="video" controls></video>
+        <h3 id="playingTitle">2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: ลิงก์ทดสอบระบบ)</h3>
+        <div class="player-container">
+            
+            <!-- ฝั่งซ้าย: เครื่องเล่น -->
+            <div class="video-area">
+                <video id="video" controls></video>
+            </div>
+            
+            <!-- ฝั่งขวา: รายชื่อช่องทีวีที่ดึงมาจากไฟล์ M3U -->
+            <div class="playlist-area">
+                <div class="playlist-header">รายการช่องสตรีมมิ่ง (<span id="channelCount">0</span> ช่อง)</div>
+                <ul class="channel-list" id="channelList">
+                    <li class="channel-item active" onclick="playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS')">📺 คลิกเล่นสตรีมทดสอบระบบ</li>
+                </ul>
+            </div>
+
+        </div>
     </div>
 
     <script>
-        // โค้ดสำหรับส่งไฟล์ไปหลังบ้าน (Backend) ด้วย AJAX
+        const video = document.getElementById('video');
+        let hls = null;
+
+        // ฟังก์ชันสำหรับสั่งเล่นลิงก์วิดีโอ M3U8
+        function playStream(url, channelName) {
+            document.getElementById('playingTitle').innerText = `2. เครื่องเล่นวิดีโอ M3U8 (กำลังเล่น: ${channelName})`;
+            
+            // ไฮไลต์ช่องที่กำลังเลือกอยู่
+            const items = document.querySelectorAll('.channel-item');
+            items.forEach(item => item.classList.remove('active'));
+            event?.target?.classList.add('active');
+
+            if (Hls.isSupported()) {
+                if (hls) hls.destroy(); // ล้างหน่วยความจำช่องเก่าออกก่อน
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play().catch(() => console.log("รอผู้ใช้กด Play"));
+                });
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    if (data.fatal) console.error("สตรีมนี้มีปัญหาเรื่องโหลดข้อมูลหรือระบบความปลอดภัย CORS");
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.play().catch(() => console.log("รอผู้ใช้กด Play"));
+            }
+        }
+
+        // เริ่มต้นรันช่องทดสอบระบบตัวแรก
+        playStream('https://mux.dev', 'สตรีมทดสอบระบบ HLS');
+
+        // ฟังก์ชันแกะรหัสอ่านเนื้อหาในไฟล์ M3U (M3U Parser)
+        function parseM3U(textContent) {
+            const lines = textContent.split('\n');
+            const channels = [];
+            let currentName = '';
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('#EXTINF:')) {
+                    // แยกรหัสเอาชื่อช่องออกมาหลังจากเครื่องหมายจุลภาค (,)
+                    const commaIndex = line.lastIndexOf(',');
+                    currentName = commaIndex !== -1 ? line.substring(commaIndex + 1).trim() : 'ช่องไม่มีชื่อ';
+                } else if (line.startsWith('http')) {
+                    // เจอบรรทัดลิงก์สตรีม จับคู่กับชื่อช่องแล้วเก็บลงอาร์เรย์
+                    channels.push({ name: currentName || 'ช่องนิรนาม', url: line });
+                    currentName = ''; // ล้างค่าเพื่อรอรอบใหม่
+                }
+            }
+            return channels;
+        }
+
+        // ระบบฟอร์มจัดการส่งไฟล์ไปหลังบ้าน และทำการดึงช่องมาเล่นสดทันที
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('fileInput');
             const statusText = document.getElementById('uploadStatus');
+            const file = fileInput.files[0];
             
-            const formData = new FormData();
-            formData.append('playlist', fileInput.files[0]);
+            if(!file) return;
 
-            statusText.innerText = "กำลังอัปโหลด...";
+            // ขั้นตอนเสริมพิเศษหน้าบ้าน: อ่านและพรีวิวช่องให้เล่นบนหน้าจอก่อนทันที
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const channels = parseM3U(text);
+                
+                const listContainer = document.getElementById('channelList');
+                document.getElementById('channelCount').innerText = channels.length;
+                
+                if(channels.length === 0) {
+                    listContainer.innerHTML = '<li class="channel-item">❌ ไม่พบข้อความลิงก์สตรีมในไฟล์นี้</li>';
+                    return;
+                }
+
+                listContainer.innerHTML = ''; // ล้างรายการเก่าออก
+                channels.forEach((ch, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'channel-item';
+                    li.innerText = `📺 ${ch.name}`;
+                    li.onclick = (event) => playStream(ch.url, ch.name);
+                    listContainer.appendChild(li);
+                    
+                    // สั่งให้ลองเล่นช่องแรกสุดของไฟล์ที่นำเข้ามาทันที
+                    if(index === 0) playStream(ch.url, ch.name);
+                });
+            };
+            reader.readAsText(file);
+
+            // ขั้นตอนหลัก: ส่งไฟล์ไปเก็บบันทึกบนฐานข้อมูลโฟลเดอร์หลังบ้าน (Render Server)
+            const formData = new FormData();
+            formData.append('playlist', file);
+            statusText.style.color = '#333';
+            statusText.innerText = "กำลังส่งไฟล์บันทึกลงฐานข้อมูลหลังบ้าน...";
 
             try {
                 const response = await fetch('/api/upload-playlist', {
@@ -50,26 +163,17 @@
                 const result = await response.json();
                 
                 if(response.ok) {
-                    statusText.innerHTML = `✅ ${result.message} <br> ชื่อนามแฝงไฟล์ในระบบ: <b>${result.fileId}</b>`;
+                    statusText.style.color = 'green';
+                    statusText.innerHTML = `✅ บันทึกเข้าคลังหลังบ้านสำเร็จ! ชื่อไฟล์รหัส: <b>${result.fileId}</b>`;
                 } else {
-                    statusText.innerText = `❌ เกิดข้อผิดพลาด: ${result.error}`;
+                    statusText.style.color = 'red';
+                    statusText.innerText = `❌ เซิร์ฟเวอร์ปฏิเสธ: ${result.error}`;
                 }
             } catch (error) {
-                statusText.innerText = "❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้";
+                statusText.style.color = 'orange';
+                statusText.innerText = `⚠️ ประมวลผลสำเร็จหน้าบ้าน แต่เชื่อมเซิร์ฟเวอร์หลังบ้านเพื่อเซฟไฟล์ลงไดเรกทอรีไม่ได้`;
             }
         });
-
-        // โค้ดเล่นวิดีโอ (ตัวอย่างลิงก์สตรีมทดสอบ)
-        const video = document.getElementById('video');
-        const videoSrc = 'https://mux.dev'; 
-
-        if (Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(videoSrc);
-            hls.attachMedia(video);
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = videoSrc;
-        }
     </script>
 </body>
 </html>
